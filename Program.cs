@@ -1,101 +1,129 @@
 using System;
+using System.Globalization;
 
-namespace VectorSystem
+abstract class VectorSystemBase : IDisposable
 {
-    // Базовий клас: система двох векторів
-    class TwoVectors
+    private bool _disposed;
+    private readonly double[][] _vectors;
+    protected const double DeterminantEpsilon = 1e-9;
+
+    protected VectorSystemBase(int vectorCount, int dimension)
     {
-        protected double[] A = new double[2];
-        protected double[] B = new double[2];
+        _vectors = new double[vectorCount][];
+        for (int i = 0; i < vectorCount; i++)
+            _vectors[i] = new double[dimension];
+    }
 
-        public virtual void InputVectors()
+    protected double[][] Vectors => _vectors;
+
+    // ✅ Введення векторів з урахуванням локалі (кома або крапка)
+    public virtual void InputVectors()
+    {
+        for (int i = 0; i < _vectors.Length; i++)
         {
-            Console.WriteLine("Введіть координати вектора A (a1 a2):");
-            for (int i = 0; i < 2; i++)
-                A[i] = double.Parse(Console.ReadLine());
+            Console.WriteLine($"Введіть координати вектора {i + 1} через пробіл:");
+            string? input = Console.ReadLine()?.Replace(',', '.');
 
-            Console.WriteLine("Введіть координати вектора B (b1 b2):");
-            for (int i = 0; i < 2; i++)
-                B[i] = double.Parse(Console.ReadLine());
-        }
+            if (input == null)
+            {
+                Console.WriteLine("Помилка вводу! Рядок порожній.");
+                i--;
+                continue;
+            }
 
-        public virtual void DisplayVectors()
-        {
-            Console.WriteLine($"A = ({A[0]}, {A[1]})");
-            Console.WriteLine($"B = ({B[0]}, {B[1]})");
-        }
+            string[] parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != _vectors[i].Length)
+            {
+                Console.WriteLine("Неправильна кількість координат, спробуйте ще раз.");
+                i--;
+                continue;
+            }
 
-        public virtual bool IsLinearlyIndependent()
-        {
-            double det = A[0] * B[1] - A[1] * B[0];
-            return Math.Abs(det) > 1e-9;
+            for (int j = 0; j < _vectors[i].Length; j++)
+            {
+                if (!double.TryParse(parts[j], NumberStyles.Float, CultureInfo.InvariantCulture, out _vectors[i][j]))
+                {
+                    Console.WriteLine("Помилка при парсингу числа, спробуйте ще раз.");
+                    i--;
+                    break;
+                }
+            }
         }
     }
 
-    // Похідний клас: система трьох векторів
-    class ThreeVectors : TwoVectors
+    // ✅ Єдиний метод форматованого виводу
+    public virtual void DisplayVectors()
     {
-        private double[] C = new double[3];
-
-        public override void InputVectors()
-        {
-            A = new double[3];
-            B = new double[3];
-
-            Console.WriteLine("Введіть координати вектора A (a1 a2 a3):");
-            for (int i = 0; i < 3; i++)
-                A[i] = double.Parse(Console.ReadLine());
-
-            Console.WriteLine("Введіть координати вектора B (b1 b2 b3):");
-            for (int i = 0; i < 3; i++)
-                B[i] = double.Parse(Console.ReadLine());
-
-            Console.WriteLine("Введіть координати вектора C (c1 c2 c3):");
-            for (int i = 0; i < 3; i++)
-                C[i] = double.Parse(Console.ReadLine());
-        }
-
-        public override void DisplayVectors()
-        {
-            Console.WriteLine($"A = ({A[0]}, {A[1]}, {A[2]})");
-            Console.WriteLine($"B = ({B[0]}, {B[1]}, {B[2]})");
-            Console.WriteLine($"C = ({C[0]}, {C[1]}, {C[2]})");
-        }
-
-        public override bool IsLinearlyIndependent()
-        {
-            double det =
-                A[0] * (B[1] * C[2] - B[2] * C[1]) -
-                A[1] * (B[0] * C[2] - B[2] * C[0]) +
-                A[2] * (B[0] * C[1] - B[1] * C[0]);
-
-            return Math.Abs(det) > 1e-9;
-        }
+        Console.WriteLine("Вектори системи:");
+        foreach (var v in _vectors)
+            Console.WriteLine("(" + string.Join(", ", Array.ConvertAll(v, x => x.ToString("F2", CultureInfo.InvariantCulture))) + ")");
     }
 
-    class Program
+    public abstract bool IsLinearlyIndependent();
+
+    // ✅ Спрощена реалізація Dispose (без фіналізатора)
+    public void Dispose()
     {
-        static void Main()
+        if (!_disposed)
         {
-            Console.OutputEncoding = System.Text.Encoding.UTF8;
-            Console.WriteLine("Оберіть тип системи векторів (2 або 3):");
-            int choice = int.Parse(Console.ReadLine());
+            // очищаємо посилання
+            for (int i = 0; i < _vectors.Length; i++)
+                Array.Clear(_vectors[i], 0, _vectors[i].Length);
 
-            TwoVectors system;
-
-            if (choice == 2)
-                system = new TwoVectors();
-            else
-                system = new ThreeVectors();
-
-            system.InputVectors();
-            Console.WriteLine("\nВведені вектори:");
-            system.DisplayVectors();
-
-            bool independent = system.IsLinearlyIndependent();
-
-            Console.WriteLine($"\nСистема векторів {(independent ? "є" : "не є")} лінійно незалежною.");
+            _disposed = true;
         }
     }
 }
 
+// ===================== Два вектори =====================
+
+class TwoVectors : VectorSystemBase
+{
+    public TwoVectors() : base(2, 2) { }
+
+    public override bool IsLinearlyIndependent()
+    {
+        double det = Vectors[0][0] * Vectors[1][1] - Vectors[0][1] * Vectors[1][0];
+        return Math.Abs(det) > DeterminantEpsilon;
+    }
+}
+
+// ===================== Три вектори =====================
+
+class ThreeVectors : VectorSystemBase
+{
+    public ThreeVectors() : base(3, 3) { }
+
+    public override bool IsLinearlyIndependent()
+    {
+        double[][] v = Vectors;
+        double det =
+            v[0][0] * (v[1][1] * v[2][2] - v[1][2] * v[2][1]) -
+            v[0][1] * (v[1][0] * v[2][2] - v[1][2] * v[2][0]) +
+            v[0][2] * (v[1][0] * v[2][1] - v[1][1] * v[2][0]);
+
+        return Math.Abs(det) > DeterminantEpsilon;
+    }
+}
+
+// ===================== Main =====================
+
+class Program
+{
+    static void Main()
+    {
+        Console.WriteLine("Оберіть систему: 1 — два вектори, 2 — три вектори");
+        string? choice = Console.ReadLine();
+
+        VectorSystemBase system = choice == "1" ? new TwoVectors() : new ThreeVectors();
+
+        system.InputVectors();
+        system.DisplayVectors();
+
+        Console.WriteLine(system.IsLinearlyIndependent()
+            ? "Вектори лінійно незалежні."
+            : "Вектори лінійно залежні.");
+
+        system.Dispose();
+    }
+}
