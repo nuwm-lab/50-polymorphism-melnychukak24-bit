@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 
 namespace VectorSystem
 {
@@ -22,7 +23,7 @@ namespace VectorSystem
         {
             for (int v = 0; v < Vectors.Length; v++)
             {
-                Console.WriteLine($"Введіть координати вектора {v + 1} ({string.Join(" ", new string[Dimension].Select((_, i) => $"x{i + 1}"))}):");
+                Console.WriteLine($"Введіть координати вектора {v + 1} ({string.Join(" ", Enumerable.Range(1, Dimension).Select(i => $"x{i}"))}):");
                 for (int i = 0; i < Dimension; i++)
                 {
                     while (true)
@@ -46,10 +47,10 @@ namespace VectorSystem
                 Console.WriteLine($"V{v + 1} = ({string.Join(", ", Vectors[v])})");
         }
 
-        // Перевірка лінійної незалежності (абстрактна, різна реалізація для 2D і 3D)
+        // Перевірка лінійної незалежності — абстрактна, реалізується у похідних класах
         public abstract bool IsLinearlyIndependent();
 
-        // IDisposable (для повноти прикладу)
+        // IDisposable (для керування ресурсами)
         public void Dispose()
         {
             Vectors = null;
@@ -78,7 +79,9 @@ namespace VectorSystem
 
         public override bool IsLinearlyIndependent()
         {
-            double[] A = Vectors[0], B = Vectors[1], C = Vectors[2];
+            double[] A = Vectors[0];
+            double[] B = Vectors[1];
+            double[] C = Vectors[2];
 
             double det =
                 A[0] * (B[1] * C[2] - B[2] * C[1]) -
@@ -114,3 +117,4 @@ namespace VectorSystem
         }
     }
 }
+
