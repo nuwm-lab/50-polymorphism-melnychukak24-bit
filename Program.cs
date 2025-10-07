@@ -1,120 +1,177 @@
 using System;
-using System.Linq;
+using System.Globalization;
 
-namespace VectorSystem
+namespace VectorSystemApp
 {
-    // Базовий клас для системи векторів
-    abstract class VectorSystemBase : IDisposable
+    /// <summary>
+    /// Абстрактний базовий клас для системи векторів.
+    /// Реалізує IDisposable для правильного звільнення ресурсів.
+    /// </summary>
+    public abstract class VectorSystemBase : IDisposable
     {
-        protected double[][] Vectors; // масив векторів
-        public int Dimension { get; protected set; } // розмірність
+        // Константа для перевірки нульового детермінанта (замість "магічного числа")
+        protected const double Epsilon = 1e-9;
 
-        // Конструктор із вказанням кількості векторів і розмірності
+        // Захищене поле для зберігання векторів (масив масивів)
+        protected double[][] Vectors;
+
+        private bool _disposed; // прапорець для контролю повторного виклику Dispose
+
+        /// <summary>
+        /// Конструктор базового класу для ініціалізації системи векторів.
+        /// </summary>
+        /// <param name="vectorCount">Кількість векторів</param>
+        /// <param name="dimension">Розмірність кожного вектора</param>
         protected VectorSystemBase(int vectorCount, int dimension)
         {
-            Dimension = dimension;
+            if (vectorCount <= 0)
+                throw new ArgumentException("Кількість векторів має бути більшою за 0.");
+
+            if (dimension <= 0)
+                throw new ArgumentException("Розмірність має бути більшою за 0.");
+
             Vectors = new double[vectorCount][];
             for (int i = 0; i < vectorCount; i++)
                 Vectors[i] = new double[dimension];
         }
 
-        // Метод для введення координат
+        /// <summary>
+        /// Абстрактний метод для перевірки лінійної незалежності.
+        /// </summary>
+        public abstract bool IsLinearlyIndependent();
+
+        /// <summary>
+        /// Введення координат векторів користувачем.
+        /// </summary>
         public virtual void InputVectors()
         {
-            for (int v = 0; v < Vectors.Length; v++)
+            for (int i = 0; i < Vectors.Length; i++)
             {
-                Console.WriteLine($"Введіть координати вектора {v + 1} ({string.Join(" ", Enumerable.Range(1, Dimension).Select(i => $"x{i}"))}):");
-                for (int i = 0; i < Dimension; i++)
+                Console.WriteLine($"\nВведіть координати вектора {i + 1}:");
+                for (int j = 0; j < Vectors[i].Length; j++)
                 {
+                    double value;
                     while (true)
                     {
-                        Console.Write($"x{i + 1} = ");
-                        if (double.TryParse(Console.ReadLine(), out double value))
-                        {
-                            Vectors[v][i] = value;
+                        Console.Write($"  Координата {j + 1}: ");
+                        string? input = Console.ReadLine();
+                        if (double.TryParse(input, NumberStyles.Float, CultureInfo.InvariantCulture, out value))
                             break;
-                        }
-                        Console.WriteLine("❌ Помилка введення! Спробуйте ще раз.");
+
+                        Console.WriteLine("  ❌ Невірний формат. Спробуйте ще раз (використовуйте крапку як роздільник).");
                     }
+                    Vectors[i][j] = value;
                 }
             }
         }
 
-        // Вивід векторів
+        /// <summary>
+        /// Виведення координат усіх векторів.
+        /// </summary>
         public virtual void DisplayVectors()
         {
-            for (int v = 0; v < Vectors.Length; v++)
-                Console.WriteLine($"V{v + 1} = ({string.Join(", ", Vectors[v])})");
+            Console.WriteLine("\n--- Вектори системи ---");
+            for (int i = 0; i < Vectors.Length; i++)
+            {
+                Console.Write($"Вектор {i + 1}: ");
+                Console.WriteLine(string.Join("  ", Vectors[i]));
+            }
         }
 
-        // Перевірка лінійної незалежності — абстрактна, реалізується у похідних класах
-        public abstract bool IsLinearlyIndependent();
-
-        // IDisposable (для керування ресурсами)
+        /// <summary>
+        /// Реалізація шаблону IDisposable.
+        /// </summary>
         public void Dispose()
         {
-            Vectors = null;
+            Dispose(true);
             GC.SuppressFinalize(this);
         }
 
-        ~VectorSystemBase() => Dispose();
+        /// <summary>
+        /// Захищений метод для звільнення ресурсів.
+        /// </summary>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+
+            if (disposing)
+            {
+                // Тут можна звільняти керовані ресурси, якщо вони є
+                Vectors = null!;
+            }
+
+            // Некеровані ресурси (якби були) звільняються тут
+
+            _disposed = true;
+        }
+
+        /// <summary>
+        /// Фіналізатор (викликається лише якщо Dispose() не був викликаний).
+        /// </summary>
+        ~VectorSystemBase()
+        {
+            Dispose(false);
+        }
     }
 
-    // Система двох векторів
-    class TwoVectors : VectorSystemBase
+    /// <summary>
+    /// Клас для системи з двох векторів (перевірка лінійної незалежності).
+    /// </summary>
+    public class TwoVectors : VectorSystemBase
     {
         public TwoVectors() : base(2, 2) { }
 
         public override bool IsLinearlyIndependent()
         {
-            double det = Vectors[0][0] * Vectors[1][1] - Vectors[0][1] * Vectors[1][0];
-            return Math.Abs(det) > 1e-9;
+            double determinant = Vectors[0][0] * Vectors[1][1] - Vectors[0][1] * Vectors[1][0];
+            return Math.Abs(determinant) > Epsilon;
         }
     }
 
-    // Система трьох векторів
-    class ThreeVectors : VectorSystemBase
+    /// <summary>
+    /// Клас для системи з трьох векторів (у тривимірному просторі).
+    /// </summary>
+    public class ThreeVectors : VectorSystemBase
     {
         public ThreeVectors() : base(3, 3) { }
 
         public override bool IsLinearlyIndependent()
         {
-            double[] A = Vectors[0];
-            double[] B = Vectors[1];
-            double[] C = Vectors[2];
-
             double det =
-                A[0] * (B[1] * C[2] - B[2] * C[1]) -
-                A[1] * (B[0] * C[2] - B[2] * C[0]) +
-                A[2] * (B[0] * C[1] - B[1] * C[0]);
+                Vectors[0][0] * (Vectors[1][1] * Vectors[2][2] - Vectors[1][2] * Vectors[2][1]) -
+                Vectors[0][1] * (Vectors[1][0] * Vectors[2][2] - Vectors[1][2] * Vectors[2][0]) +
+                Vectors[0][2] * (Vectors[1][0] * Vectors[2][1] - Vectors[1][1] * Vectors[2][0]);
 
-            return Math.Abs(det) > 1e-9;
+            return Math.Abs(det) > Epsilon;
         }
     }
 
-    class Program
+    /// <summary>
+    /// Головний клас програми.
+    /// </summary>
+    internal static class Program
     {
-        static void Main()
+        private static void Main()
         {
             Console.OutputEncoding = System.Text.Encoding.UTF8;
-            Console.WriteLine("Оберіть тип системи векторів (2 або 3):");
+            Console.WriteLine("=== Перевірка лінійної незалежності векторів ===");
+            Console.WriteLine("1 — система з 2 векторів (у площині)");
+            Console.WriteLine("2 — система з 3 векторів (у просторі)");
+            Console.Write("Ваш вибір: ");
 
             int choice;
-            while (!int.TryParse(Console.ReadLine(), out choice) || (choice != 2 && choice != 3))
+            while (!int.TryParse(Console.ReadLine(), out choice) || (choice != 1 && choice != 2))
             {
-                Console.WriteLine("❌ Невірний вибір! Введіть 2 або 3:");
+                Console.Write("❌ Вибір невірний. Введіть 1 або 2: ");
             }
 
-            using (VectorSystemBase system = choice == 2 ? new TwoVectors() : new ThreeVectors())
-            {
-                system.InputVectors();
-                Console.WriteLine("\nВведені вектори:");
-                system.DisplayVectors();
+            using VectorSystemBase system = (choice == 1) ? new TwoVectors() : new ThreeVectors();
 
-                bool independent = system.IsLinearlyIndependent();
-                Console.WriteLine($"\n✅ Система векторів {(independent ? "є" : "не є")} лінійно незалежною.");
-            }
+            system.InputVectors();
+            system.DisplayVectors();
+
+            bool independent = system.IsLinearlyIndependent();
+            Console.WriteLine($"\nРезультат: {(independent ? "✅ Вектори лінійно незалежні" : "❌ Вектори лінійно залежні")}");
         }
     }
 }
-
